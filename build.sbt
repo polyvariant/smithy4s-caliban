@@ -29,14 +29,31 @@ lazy val core = projectMatrix
     name := "smithy4s-caliban",
     commonSettings,
     libraryDependencies ++= Seq(
+      "com.github.ghostdogpr" %%% "caliban-http4s" % "2.2.1",
       "com.disneystreaming.smithy4s" %%% "smithy4s-core" % smithy4s.codegen.BuildInfo.version,
+      // todo: get rid of this and only use our own types
+      "com.disneystreaming.smithy4s" %%% "smithy4s-tests" % smithy4s
+        .codegen
+        .BuildInfo
+        .version % Test,
       "com.disneystreaming" %%% "weaver-cats" % "0.8.3" % Test,
     ),
     testFrameworks += new TestFramework("weaver.framework.CatsEffect"),
+    Smithy4sCodegenPlugin.defaultSettings(Test),
+    scalacOptions --= {
+      if (scalaVersion.value.startsWith("3"))
+        Seq("-Ykind-projector:underscores")
+      else
+        Seq()
+    },
+    scalacOptions ++= {
+      if (scalaVersion.value.startsWith("3"))
+        Seq("-Ykind-projector")
+      else
+        Seq()
+    },
   )
   .jvmPlatform(Seq(Scala213, Scala3))
-  .jsPlatform(Seq(Scala213, Scala3))
-  .nativePlatform(Seq(Scala3))
 
 lazy val root = project
   .in(file("."))
