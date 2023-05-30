@@ -38,8 +38,8 @@ private object CalibanSchemaVisitor extends SchemaVisitor[Schema[Any, *]] {
       .unitSchema
       .asInstanceOf[Schema[Any, Document]] // TODO
     implicit val timestampSchema: Schema[Any, Timestamp] = Schema
-      .unitSchema
-      .asInstanceOf[Schema[Any, Timestamp]] // TODO
+      .instantSchema
+      .contramap(_.toInstant) // TODO UNTESTED
 
     Primitive
       .deriving[Schema[Any, *]]
