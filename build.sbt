@@ -32,10 +32,12 @@ lazy val core = projectMatrix
       "com.disneystreaming.smithy4s" %%% "smithy4s-core" % smithy4s.codegen.BuildInfo.version,
       "com.disneystreaming" %%% "weaver-cats" % "0.8.3" % Test,
     ),
+    testFrameworks += new TestFramework("weaver.framework.CatsEffect"),
   )
   .jvmPlatform(Seq(Scala213, Scala3))
   .jsPlatform(Seq(Scala213, Scala3))
   .nativePlatform(Seq(Scala3))
 
 lazy val root = project
+  .in(file("."))
   .aggregate(core.componentProjects.map(p => p: ProjectReference): _*)
