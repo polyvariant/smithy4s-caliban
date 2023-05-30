@@ -37,5 +37,5 @@ lazy val core = projectMatrix
   .jsPlatform(Seq(Scala213, Scala3))
   .nativePlatform(Seq(Scala3))
 
-lazy val root = tlCrossRootProject
-  .aggregate(core)
+lazy val root = project
+  .aggregate(core.componentProjects.map(p => p: ProjectReference): _*)
