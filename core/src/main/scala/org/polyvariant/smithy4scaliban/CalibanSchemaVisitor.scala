@@ -16,66 +16,59 @@
 
 package org.polyvariant.smithy4scaliban
 
+import caliban.ResponseValue
+import caliban.Value
+import caliban.introspection.adt.__Type
 import caliban.schema._
+import cats.implicits._
+import smithy.api.TimestampFormat
 import smithy4s.Bijection
 import smithy4s.ByteArray
 import smithy4s.Document
 import smithy4s.Hints
-import smithy4s.schema.SchemaVisitor
-import smithy4s.schema.Field
-import smithy4s.schema.Primitive
-import smithy4s.schema.Field.Wrapped
+import smithy4s.IntEnum
+import smithy4s.Lazy
+import smithy4s.Refinement
 import smithy4s.ShapeId
 import smithy4s.Timestamp
-import smithy4s.Refinement
-import smithy4s.schema.SchemaAlt
-import smithy4s.schema.Alt
-import caliban.introspection.adt.__Type
 import smithy4s.schema
+import smithy4s.schema.Alt
 import smithy4s.schema.CollectionTag
-import smithy4s.Lazy
-import smithy4s.IntEnum
-import smithy.api.TimestampFormat
-import caliban.Value
-import caliban.ResponseValue
-import caliban.InputValue
-import cats.implicits._
+import smithy4s.schema.Field
+import smithy4s.schema.Field.Wrapped
+import smithy4s.schema.Primitive
+import smithy4s.schema.SchemaAlt
+import smithy4s.schema.SchemaVisitor
 
 private class CalibanSchemaVisitor(val cache: schema.CompilationCache[Schema[Any, *]])
   extends SchemaVisitor.Cached[Schema[Any, *]] {
+
+  private def fromScalar[A](
+    shapeId: ShapeId
+  )(
+    f: A => ResponseValue
+  ): Schema[Any, A] = Schema
+    .scalarSchema(
+      name = shapeId.name,
+      description = None,
+      specifiedBy = None,
+      directives = None,
+      makeResponse = f,
+    )
 
   override def primitive[P](
     shapeId: ShapeId,
     hints: Hints,
     tag: Primitive[P],
   ): Schema[Any, P] = {
-    implicit val byteSchema: Schema[Any, Byte] = Schema
-      .scalarSchema(
-        name = shapeId.name,
-        description = None,
-        specifiedBy = None,
-        directives = None,
-        makeResponse = v => Value.IntValue(v.toInt),
-      )
+    implicit val byteSchema: Schema[Any, Byte] = fromScalar(shapeId)(v => Value.IntValue(v.toInt))
 
     // base-64 encoded string
-    implicit val blobSchema: Schema[Any, ByteArray] = Schema
-      .scalarSchema(
-        name = shapeId.name,
-        description = None,
-        specifiedBy = None,
-        directives = None,
-        makeResponse = v => Value.StringValue(v.toString()),
-      )
+    implicit val blobSchema: Schema[Any, ByteArray] =
+      fromScalar(shapeId)(v => Value.StringValue(v.toString()))
 
     // json "any" type
-    implicit val documentSchema: Schema[Any, Document] = Schema.scalarSchema(
-      name = shapeId.name,
-      description = None,
-      specifiedBy = None,
-      directives = None,
-      makeResponse = documentToValue,
-    )
+    implicit val documentSchema: Schema[Any, Document] = fromScalar(shapeId)(documentToValue)
 
     implicit val timestampSchema: Schema[Any, Timestamp] =
       hints.get(TimestampFormat) match {
