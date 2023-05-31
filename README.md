@@ -26,6 +26,8 @@ Follow the [quickstart steps](https://disneystreaming.github.io/smithy4s/docs/ov
 
 For example:
 
+<!-- Development note - this snippet should be kept in sync with hello.smithy in `modules/docs` -->
+
 ```smithy
 $version: "2"
 
@@ -35,6 +37,7 @@ service HelloService {
     operations: [GetHello]
 }
 
+@readonly
 operation GetHello {
     input := {
         @required

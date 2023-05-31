@@ -6,6 +6,7 @@ service HelloService {
     operations: [GetHello]
 }
 
+@readonly
 operation GetHello {
     input := {
         @required
