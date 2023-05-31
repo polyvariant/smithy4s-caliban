@@ -18,3 +18,31 @@ union Foo {
     bInt: BigInteger
     bDec: BigDecimal
 }
+
+service WeatherService {
+    operations: [ListCities, RefreshCities]
+}
+
+@readonly
+operation ListCities {
+    output := {
+        @required
+        cities: Cities
+    }
+}
+
+list Cities {
+    member: City
+}
+
+structure City {
+    @required
+    name: String
+}
+
+operation RefreshCities {
+    output := {
+        @required
+        result: String
+    }
+}

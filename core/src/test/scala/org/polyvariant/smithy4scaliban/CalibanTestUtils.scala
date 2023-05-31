@@ -22,9 +22,19 @@ import caliban.schema.Schema
 import cats.effect.IO
 import io.circe.Json
 import io.circe.syntax._
+import caliban.GraphQL
+import caliban.wrappers.Wrappers
 
 object CalibanTestUtils {
   private implicit val rt: zio.Runtime[Any] = zio.Runtime.default
+
+  def testApiResult[A](
+    api: GraphQL[Any],
+    q: String,
+  ): IO[Json] = (api @@ Wrappers.printErrors)
+    .interpreterAsync[IO]
+    .flatMap(_.executeAsync[IO](q))
+    .map(_.data.asJson)
 
   def testQueryResult[A](
     api: A,

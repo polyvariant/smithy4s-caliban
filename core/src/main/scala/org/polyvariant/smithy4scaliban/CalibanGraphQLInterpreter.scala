@@ -16,53 +16,115 @@
 
 package org.polyvariant.smithy4scaliban
 
+import caliban.GraphQL
+import caliban.RootResolver
 import caliban.interop.cats.FromEffect
 import caliban.interop.cats.implicits._
 import caliban.schema._
-import cats.effect.kernel.Async
 import cats.effect.std.Dispatcher
+import smithy4s.kinds.FunctorInterpreter
+import smithy4s.kinds.FunctorAlgebra
 import smithy4s.Service
+import smithy.api.Readonly
+import caliban.introspection.adt.__Field
+import smithy4s.Endpoint
+import smithy4s.schema
+import caliban.InputValue
 
 object CalibanGraphQLInterpreter {
 
-  def server[Alg[_[_, _, _, _, _]], F[_]: Async: Dispatcher](
+  def server[Alg[_[_, _, _, _, _]], F[_]: Dispatcher](
+    impl: FunctorAlgebra[Alg, F]
+  )(
     implicit
     service: Service[Alg]
-  ): Schema[Any, service.Impl[F]] =
-    // todo: renaming to account for graphql conventions (camelCase ops etc.)?
-    // todo: splitting into queries/mutations?
-    Schema.obj(name = service.id.name, description = None)(implicit fa =>
-      service.endpoints.map(endpointToSchema[F].apply(service)(_))
-    )
+  ): GraphQL[Any] = {
+    val (queries, mutations) = service.endpoints.partition(_.hints.has[Readonly])
 
-  private def endpointToSchema[F[_]: Async: Dispatcher] = new EndpointToSchemaPartiallyApplied[F]
+    val interp = service.toPolyFunction(impl)
+
+    val querySchema: Schema[Any, service.FunctorInterpreter[F]] =
+      Schema.obj(name = "Queries", description = None)(implicit fa =>
+        queries.map(endpointToSchema[F].apply(_))
+      )
+
+    val mutationSchema: Schema[Any, service.FunctorInterpreter[F]] =
+      Schema.obj(name = "Mutations", description = None)(implicit fa =>
+        mutations.map(endpointToSchema[F].apply(_))
+      )
+
+    caliban.graphQL(
+      RootResolver(
+        queryResolver = Option.when(queries.nonEmpty)(interp),
+        mutationResolver = Option.when(mutations.nonEmpty)(interp),
+        subscriptionResolver = None,
+      )
+    )(
+      SubscriptionSchema.unitSubscriptionSchema,
+      querySchema,
+      mutationSchema,
+      Schema.unitSchema,
+    )
+  }
+
+  private def endpointToSchema[F[_]: Dispatcher] = new EndpointToSchemaPartiallyApplied[F]
 
   // "partially-applied type" pattern used here to give the compiler a hint about what F is
   // but let it infer the remaining type parameters
-  final class EndpointToSchemaPartiallyApplied[F[_]: Async: Dispatcher] private[smithy4scaliban] {
+  final class EndpointToSchemaPartiallyApplied[F[_]: Dispatcher] private[smithy4scaliban] {
 
-    def apply[Alg[_[_, _, _, _, _]], I, E, O, SI, SO](
-      service: Service[Alg]
-    )(
-      e: service.Endpoint[I, E, O, SI, SO]
+    def apply[Op[_, _, _, _, _], I, E, O, SI, SO](
+      e: Endpoint[Op, I, E, O, SI, SO]
     )(
       implicit fa: FieldAttributes
-    ) =
-      Schema.fieldWithArgs[service.Impl[F], I](e.name) { alg =>
-        val interp = service.toPolyFunction(alg)
+    ): (__Field, FunctorInterpreter[Op, F] => Step[Any]) = {
+      val hasArgs = e.input.shapeId != schema.Schema.unit.shapeId
 
-        i => interp(e.wrap(i))
-      }(
-        Schema.functionSchema[Any, Any, I, F[O]](
-          e.input.compile(ArgBuilderVisitor),
-          e.input.compile(CalibanSchemaVisitor),
+      if (hasArgs)
+        // function type
+        Schema.fieldWithArgs(e.name.uncapitalize) { (interp: FunctorInterpreter[Op, F]) => (i: I) =>
+          interp(e.wrap(i))
+        }(
+          Schema.functionSchema[Any, Any, I, F[O]](
+            e.input.compile(ArgBuilderVisitor),
+            e.input.compile(CalibanSchemaVisitor),
+            catsEffectSchema(
+              FromEffect.forDispatcher,
+              e.output.compile(CalibanSchemaVisitor),
+            ),
+          ),
+          fa,
+        )
+      else {
+        val inputDecodedFromEmptyObj: I =
+          e
+            .input
+            .compile(ArgBuilderVisitor)
+            .build(InputValue.ObjectValue(Map.empty))
+            .toTry
+            .get
+
+        Schema.field(e.name.uncapitalize) { (interp: FunctorInterpreter[Op, F]) =>
+          interp(e.wrap(inputDecodedFromEmptyObj))
+        }(
           catsEffectSchema(
             FromEffect.forDispatcher,
             e.output.compile(CalibanSchemaVisitor),
           ),
-        ),
-        fa,
-      )
+          fa,
+        )
+      }
+    }
+
+  }
+
+  private implicit final class StringOps(val s: String) extends AnyVal {
+
+    def uncapitalize: String =
+      s match {
+        case "" => ""
+        case _  => s"${s.head.toLower}${s.tail}"
+      }
 
   }
 
