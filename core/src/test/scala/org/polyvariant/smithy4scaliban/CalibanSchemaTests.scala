@@ -32,6 +32,8 @@ import smithy4s.example.Rec
 import Smithy4sTestUtils._
 import smithy4s.Timestamp
 import smithy.api.TimestampFormat
+import smithy4s.ByteArray
+import smithy4s.Document
 
 object CalibanSchemaTests extends SimpleIOSuite {
   // Workaround for https://github.com/disneystreaming/smithy4s/issues/537
@@ -161,6 +163,65 @@ object CalibanSchemaTests extends SimpleIOSuite {
       """query { item }""".stripMargin,
     )(EnumResult.schema.nested("item"))
       .map(assert.eql(_, Json.obj("item" := 2)))
+  }
+
+  test("byte schema") {
+    testQueryResultWithSchema(
+      42.toByte,
+      """query { item }""".stripMargin,
+    )(Schema.byte.nested("item"))
+      .map(assert.eql(_, Json.obj("item" := 42)))
+  }
+
+  test("blob schema") {
+    testQueryResultWithSchema(
+      ByteArray("foo".getBytes()),
+      """query { item }""".stripMargin,
+    )(Schema.bytes.nested("item"))
+      .map(assert.eql(_, Json.obj("item" := "Zm9v")))
+  }
+
+  test("document schema") {
+    testQueryResultWithSchema(
+      Document.obj(
+        "str" -> Document.fromString("test"),
+        "int" -> Document.fromInt(42),
+        "long" -> Document.fromLong(42L),
+        "float" -> Document.fromDouble(42.0d),
+        "double" -> Document.fromDouble(42.0d),
+        "bigint" -> Document.fromBigDecimal(BigDecimal(10)),
+        "bigdecimal" -> Document.fromBigDecimal(BigDecimal(10)),
+        "arr" -> Document.array(
+          Document.fromString("string in list"),
+          Document.obj(
+            "k1" -> Document.fromString("in array object")
+          ),
+        ),
+        "obj" -> Document.obj("k2" -> Document.fromString("in object")),
+      ),
+      """query { item }""".stripMargin,
+    )(Schema.document.nested("item"))
+      .map(
+        assert.eql(
+          _,
+          Json.obj(
+            "item" := Json.obj(
+              "str" := "test",
+              "int" := 42,
+              "long" := 42L,
+              "float" := 42.0d,
+              "double" := 42.0d,
+              "bigint" := BigDecimal(10),
+              "bigdecimal" := BigDecimal(10),
+              "arr" := List(
+                "string in list".asJson,
+                Map("k1" := "in array object").asJson,
+              ),
+              "obj" := Map("k2" := "in object"),
+            )
+          ),
+        )
+      )
   }
 
   test("timestamp schema (default: epoch second)") {

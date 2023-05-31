@@ -36,6 +36,10 @@ import smithy4s.schema.CollectionTag
 import smithy4s.Lazy
 import smithy4s.IntEnum
 import smithy.api.TimestampFormat
+import caliban.Value
+import caliban.ResponseValue
+import caliban.InputValue
+import cats.implicits._
 
 private class CalibanSchemaVisitor(val cache: schema.CompilationCache[Schema[Any, *]])
   extends SchemaVisitor.Cached[Schema[Any, *]] {
@@ -46,14 +50,33 @@ private class CalibanSchemaVisitor(val cache: schema.CompilationCache[Schema[Any
     tag: Primitive[P],
   ): Schema[Any, P] = {
     implicit val byteSchema: Schema[Any, Byte] = Schema
-      .unitSchema
-      .asInstanceOf[Schema[Any, Byte]] // TODO
+      .scalarSchema(
+        name = shapeId.name,
+        description = None,
+        specifiedBy = None,
+        directives = None,
+        makeResponse = v => Value.IntValue(v.toInt),
+      )
+
+    // base-64 encoded string
     implicit val blobSchema: Schema[Any, ByteArray] = Schema
-      .unitSchema
-      .asInstanceOf[Schema[Any, ByteArray]] // TODO
-    implicit val documentSchema: Schema[Any, Document] = Schema
-      .unitSchema
-      .asInstanceOf[Schema[Any, Document]] // TODO
+      .scalarSchema(
+        name = shapeId.name,
+        description = None,
+        specifiedBy = None,
+        directives = None,
+        makeResponse = v => Value.StringValue(v.toString()),
+      )
+
+    // json "any" type
+    implicit val documentSchema: Schema[Any, Document] = Schema.scalarSchema(
+      name = shapeId.name,
+      description = None,
+      specifiedBy = None,
+      directives = None,
+      makeResponse = documentToValue,
+    )
+
     implicit val timestampSchema: Schema[Any, Timestamp] =
       hints.get(TimestampFormat) match {
         case Some(TimestampFormat.EPOCH_SECONDS) | None =>
@@ -66,6 +89,15 @@ private class CalibanSchemaVisitor(val cache: schema.CompilationCache[Schema[Any
       .deriving[Schema[Any, *]]
       .apply(tag)
       .withName(shapeId)
+  }
+
+  private val documentToValue: Document => ResponseValue = {
+    case Document.DNull          => Value.NullValue
+    case Document.DString(s)     => Value.StringValue(s)
+    case Document.DObject(keys)  => ResponseValue.ObjectValue(keys.fmap(documentToValue).toList)
+    case Document.DArray(values) => ResponseValue.ListValue(values.map(documentToValue).toList)
+    case Document.DNumber(n)     => Value.FloatValue(n)
+    case Document.DBoolean(b)    => Value.BooleanValue(b)
   }
 
   private def field[S, A](
