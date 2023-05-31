@@ -25,6 +25,7 @@ val commonSettings = Seq(
 )
 
 lazy val core = projectMatrix
+  .in(file("modules/core"))
   .settings(
     name := "smithy4s-caliban",
     commonSettings,
@@ -51,6 +52,25 @@ lazy val core = projectMatrix
   )
   .jvmPlatform(Seq(Scala213, Scala3))
 
+lazy val docs = projectMatrix
+  .in(file("modules/docs"))
+  .settings(
+    mdocIn := new File("README.md"),
+    libraryDependencies ++= Seq(
+      "org.http4s" %%% "http4s-ember-server" % "0.23.19",
+      "com.github.ghostdogpr" %%% "caliban-http4s" % "2.2.1",
+      "com.softwaremill.sttp.tapir" %%% "tapir-json-circe" % "1.5.0",
+    ),
+    ThisBuild / githubWorkflowBuild +=
+      WorkflowStep.Sbt(
+        List("site/mdoc")
+      ),
+  )
+  .dependsOn(core)
+  .jvmPlatform(Seq(Scala213))
+  .enablePlugins(MdocPlugin, Smithy4sCodegenPlugin)
+
 lazy val root = project
   .in(file("."))
   .aggregate(core.componentProjects.map(p => p: ProjectReference): _*)
+  .enablePlugins(NoPublishPlugin)

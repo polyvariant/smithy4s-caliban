@@ -30,15 +30,17 @@ import caliban.introspection.adt.__Field
 import smithy4s.Endpoint
 import smithy4s.schema.CompilationCache
 import caliban.InputValue
+import cats.effect.kernel.Async
+import cats.effect.kernel.Resource
 
 object CalibanGraphQLInterpreter {
 
-  def server[Alg[_[_, _, _, _, _]], F[_]: Dispatcher](
+  def server[Alg[_[_, _, _, _, _]], F[_]: Async](
     impl: FunctorAlgebra[Alg, F]
   )(
     implicit
     service: Service[Alg]
-  ): GraphQL[Any] = {
+  ): Resource[F, GraphQL[Any]] = Dispatcher.parallel[F].map { implicit dispatcher =>
     val abv = new ArgBuilderVisitor(CompilationCache.make[ArgBuilder])
     val csv = new CalibanSchemaVisitor(CompilationCache.make[Schema[Any, *]])
 

@@ -17,7 +17,6 @@
 package org.polyvariant.smithy4scaliban
 
 import cats.effect.IO
-import cats.effect.std.Dispatcher
 import io.circe.Json
 import io.circe.syntax._
 import smithy4s.example.ListCitiesOutput
@@ -47,11 +46,11 @@ object CalibanGraphQLInterpreterTests extends weaver.SimpleIOSuite {
     }
 
   test("WeatherService service query interpreter: query") {
-    Dispatcher
-      .parallel[IO]
-      .use { implicit d =>
+    CalibanGraphQLInterpreter
+      .server(weatherImpl)
+      .use { api =>
         testApiResult(
-          CalibanGraphQLInterpreter.server(weatherImpl),
+          api,
           """query {
             |  listCities {
             |    cities {
@@ -80,11 +79,11 @@ object CalibanGraphQLInterpreterTests extends weaver.SimpleIOSuite {
       )
   }
   test("WeatherService service query interpreter: mutation") {
-    Dispatcher
-      .parallel[IO]
-      .use { implicit d =>
+    CalibanGraphQLInterpreter
+      .server(weatherImpl)
+      .use { api =>
         testApiResult(
-          CalibanGraphQLInterpreter.server(weatherImpl),
+          api,
           """mutation {
             |  refreshCities {
             |    result
