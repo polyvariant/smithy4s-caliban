@@ -63,7 +63,7 @@ lazy val docs = projectMatrix
     ),
     ThisBuild / githubWorkflowBuild +=
       WorkflowStep.Sbt(
-        List("site/mdoc")
+        List("docs/mdoc")
       ),
   )
   .dependsOn(core)
