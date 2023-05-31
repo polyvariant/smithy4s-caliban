@@ -169,7 +169,7 @@ private[smithy4scaliban] object ArgBuilderVisitor extends SchemaVisitor[ArgBuild
     hints: Hints,
     tag: Primitive[P],
   ): ArgBuilder[P] = {
-    // todo: these would probably benefit from a direct implementation
+    // todo: these would probably benefit from a direct implementation... later.
     implicit val shortArgBuilder: ArgBuilder[Short] = ArgBuilder.int.flatMap {
       case i if i.isValidShort => Right(i.toShort)
       case i => Left(CalibanError.ExecutionError("Integer too large for short: " + i))
@@ -241,17 +241,19 @@ private[smithy4scaliban] object ArgBuilderVisitor extends SchemaVisitor[ArgBuild
     val keyBuilder = key.compile(this)
     val valueBuilder = value.compile(this)
 
-    { case InputValue.ObjectValue(keys) =>
-      keys
-        .toList
-        .traverse { case (k, v) =>
-          (
-            keyBuilder.build(Value.StringValue(k)),
-            valueBuilder.build(v),
-          ).tupled
-        }
-        .map(_.toMap)
-    // todo other cases
+    {
+      case InputValue.ObjectValue(keys) =>
+        keys
+          .toList
+          .traverse { case (k, v) =>
+            (
+              keyBuilder.build(Value.StringValue(k)),
+              valueBuilder.build(v),
+            ).tupled
+          }
+          .map(_.toMap)
+
+      case iv => Left(CalibanError.ExecutionError(s"Invalid input value for map: $iv"))
     }
   }
 
