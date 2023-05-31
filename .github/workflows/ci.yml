@@ -83,13 +83,15 @@ jobs:
         if: matrix.java == 'temurin@8' && matrix.os == 'ubuntu-latest'
         run: sbt '++ ${{ matrix.scala }}' doc
 
+      - run: sbt '++ ${{ matrix.scala }}' docs/mdoc
+
       - name: Make target directories
         if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main')
-        run: mkdir -p core/target/native-3 target core/target/jvm-3 core/target/js-2.13 core/target/jvm-2.13 core/target/js-3 project/target
+        run: mkdir -p target modules/core/target/jvm-2.13 modules/core/target/jvm-3 modules/docs/target/jvm-2.13 project/target
 
       - name: Compress target directories
         if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main')
-        run: tar cf targets.tar core/target/native-3 target core/target/jvm-3 core/target/js-2.13 core/target/jvm-2.13 core/target/js-3 project/target
+        run: tar cf targets.tar target modules/core/target/jvm-2.13 modules/core/target/jvm-3 modules/docs/target/jvm-2.13 project/target
 
       - name: Upload target directories
         if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main')

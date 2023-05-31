@@ -25,19 +25,52 @@ val commonSettings = Seq(
 )
 
 lazy val core = projectMatrix
+  .in(file("modules/core"))
   .settings(
     name := "smithy4s-caliban",
     commonSettings,
     libraryDependencies ++= Seq(
+      "com.github.ghostdogpr" %%% "caliban-cats" % "2.2.1",
       "com.disneystreaming.smithy4s" %%% "smithy4s-core" % smithy4s.codegen.BuildInfo.version,
       "com.disneystreaming" %%% "weaver-cats" % "0.8.3" % Test,
+      "io.circe" %% "circe-core" % "0.14.5" % Test,
     ),
     testFrameworks += new TestFramework("weaver.framework.CatsEffect"),
+    Smithy4sCodegenPlugin.defaultSettings(Test),
+    scalacOptions --= {
+      if (scalaVersion.value.startsWith("3"))
+        Seq("-Ykind-projector:underscores")
+      else
+        Seq()
+    },
+    scalacOptions ++= {
+      if (scalaVersion.value.startsWith("3"))
+        Seq("-Ykind-projector")
+      else
+        Seq()
+    },
   )
   .jvmPlatform(Seq(Scala213, Scala3))
-  .jsPlatform(Seq(Scala213, Scala3))
-  .nativePlatform(Seq(Scala3))
+
+lazy val docs = projectMatrix
+  .in(file("modules/docs"))
+  .settings(
+    mdocIn := new File("README.md"),
+    libraryDependencies ++= Seq(
+      "org.http4s" %%% "http4s-ember-server" % "0.23.19",
+      "com.github.ghostdogpr" %%% "caliban-http4s" % "2.2.1",
+      "com.softwaremill.sttp.tapir" %%% "tapir-json-circe" % "1.5.0",
+    ),
+    ThisBuild / githubWorkflowBuild +=
+      WorkflowStep.Sbt(
+        List("docs/mdoc")
+      ),
+  )
+  .dependsOn(core)
+  .jvmPlatform(Seq(Scala213))
+  .enablePlugins(MdocPlugin, Smithy4sCodegenPlugin)
 
 lazy val root = project
   .in(file("."))
   .aggregate(core.componentProjects.map(p => p: ProjectReference): _*)
+  .enablePlugins(NoPublishPlugin)

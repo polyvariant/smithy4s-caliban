@@ -14,32 +14,18 @@
  * limitations under the License.
  */
 
-import weaver._
+package org.polyvariant.smithy4scaliban
 
-object MainTest extends FunSuite {
+import smithy4s.schema.Schema
+import smithy4s.Bijection
 
-  def showPlatform =
-    (if (Platform.isJS)
-       "\u001b[36m" +
-         "JS"
-     else if (Platform.isNative)
-       "\u001b[32m" +
-         "Native"
-     else
-       "\u001b[31m" +
-         "JVM") + "\u001b[0m"
+object Smithy4sTestUtils {
 
-  def showScala =
-    (if (Platform.isScala3)
-       "\u001b[32m" +
-         "Scala 3"
-     else
-       "\u001b[31m" +
-         "Scala 2") + "\u001b[0m"
+  implicit class SchemaOps[A](schema: Schema[A]) {
+    def nested(label: String): Schema[A] =
+      Schema.struct(schema.required[A](label, identity(_)))(identity(_))
 
-  test(
-    s"main is tested ($showPlatform, $showScala)"
-  ) {
-    assert(Main.v == 1)
+    def biject[B](bijection: Bijection[A, B]): Schema[B] = Schema.bijection(schema, bijection)
   }
+
 }
