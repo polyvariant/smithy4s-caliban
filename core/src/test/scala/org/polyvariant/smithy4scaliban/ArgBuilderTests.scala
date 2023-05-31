@@ -34,10 +34,12 @@ import smithy4s.Timestamp
 import smithy.api.TimestampFormat
 import smithy4s.ByteArray
 import Smithy4sTestUtils._
+import smithy4s.schema.CompilationCache
 
 object ArgBuilderTests extends FunSuite {
-  // todo: tests for negative paths
+  private val abv = new ArgBuilderVisitor(CompilationCache.nop)
 
+  // todo: tests for negative paths
   private def decodeArgSuccess[A](
     value: InputValue,
     expected: A,
@@ -45,7 +47,7 @@ object ArgBuilderTests extends FunSuite {
     implicit schema: Schema[A]
   ) = assert.same(
     schema
-      .compile(ArgBuilderVisitor)
+      .compile(abv)
       .build(value),
     Right(expected),
   )

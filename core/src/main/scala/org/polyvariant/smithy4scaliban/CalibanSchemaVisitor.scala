@@ -37,8 +37,8 @@ import smithy4s.Lazy
 import smithy4s.IntEnum
 import smithy.api.TimestampFormat
 
-// todo: caching
-private object CalibanSchemaVisitor extends SchemaVisitor[Schema[Any, *]] {
+private class CalibanSchemaVisitor(val cache: schema.CompilationCache[Schema[Any, *]])
+  extends SchemaVisitor.Cached[Schema[Any, *]] {
 
   override def primitive[P](
     shapeId: ShapeId,
@@ -239,7 +239,7 @@ private object CalibanSchemaVisitor extends SchemaVisitor[Schema[Any, *]] {
     override def resolve(value: A): Step[Any] = underlying.resolve(value)
   }
 
-  final implicit class AnySchemaOps[A](private val schema: Schema[Any, A]) extends AnyVal {
+  final implicit class AnySchemaOps[A](private val schema: Schema[Any, A]) {
     def withName(shapeId: ShapeId): Schema[Any, A] = SchemaWithOrigin(schema, shapeId)
   }
 

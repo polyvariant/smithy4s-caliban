@@ -24,9 +24,11 @@ import io.circe.Json
 import io.circe.syntax._
 import caliban.GraphQL
 import caliban.wrappers.Wrappers
+import smithy4s.schema.CompilationCache
 
 object CalibanTestUtils {
   private implicit val rt: zio.Runtime[Any] = zio.Runtime.default
+  private val csv = new CalibanSchemaVisitor(CompilationCache.nop)
 
   def testApiResult[A](
     api: GraphQL[Any],
@@ -53,7 +55,7 @@ object CalibanTestUtils {
     q: String,
   ): IO[Json] =
     testQueryResult(api, q)(
-      implicitly[smithy4s.Schema[A]].compile(CalibanSchemaVisitor)
+      implicitly[smithy4s.Schema[A]].compile(csv)
     )
 
 }

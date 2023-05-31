@@ -52,9 +52,10 @@ import caliban.InputValue.ObjectValue
 import caliban.InputValue.ListValue
 import smithy.api.TimestampFormat
 import smithy4s.IntEnum
+import smithy4s.schema.CompilationCache
 
-// todo: caching
-private[smithy4scaliban] object ArgBuilderVisitor extends SchemaVisitor[ArgBuilder] {
+private[smithy4scaliban] class ArgBuilderVisitor(val cache: CompilationCache[ArgBuilder])
+  extends SchemaVisitor.Cached[ArgBuilder] {
 
   override def biject[A, B](
     schema: smithy4s.Schema[A],

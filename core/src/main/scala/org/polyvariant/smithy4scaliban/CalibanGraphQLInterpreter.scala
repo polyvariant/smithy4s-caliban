@@ -28,7 +28,7 @@ import smithy4s.Service
 import smithy.api.Readonly
 import caliban.introspection.adt.__Field
 import smithy4s.Endpoint
-import smithy4s.schema
+import smithy4s.schema.CompilationCache
 import caliban.InputValue
 
 object CalibanGraphQLInterpreter {
@@ -39,18 +39,21 @@ object CalibanGraphQLInterpreter {
     implicit
     service: Service[Alg]
   ): GraphQL[Any] = {
+    val abv = new ArgBuilderVisitor(CompilationCache.make[ArgBuilder])
+    val csv = new CalibanSchemaVisitor(CompilationCache.make[Schema[Any, *]])
+
     val (queries, mutations) = service.endpoints.partition(_.hints.has[Readonly])
 
     val interp = service.toPolyFunction(impl)
 
     val querySchema: Schema[Any, service.FunctorInterpreter[F]] =
       Schema.obj(name = "Queries", description = None)(implicit fa =>
-        queries.map(endpointToSchema[F].apply(_))
+        queries.map(endpointToSchema[F].apply(_, abv, csv))
       )
 
     val mutationSchema: Schema[Any, service.FunctorInterpreter[F]] =
       Schema.obj(name = "Mutations", description = None)(implicit fa =>
-        mutations.map(endpointToSchema[F].apply(_))
+        mutations.map(endpointToSchema[F].apply(_, abv, csv))
       )
 
     caliban.graphQL(
@@ -74,11 +77,13 @@ object CalibanGraphQLInterpreter {
   final class EndpointToSchemaPartiallyApplied[F[_]: Dispatcher] private[smithy4scaliban] {
 
     def apply[Op[_, _, _, _, _], I, E, O, SI, SO](
-      e: Endpoint[Op, I, E, O, SI, SO]
+      e: Endpoint[Op, I, E, O, SI, SO],
+      abv: ArgBuilderVisitor,
+      csv: CalibanSchemaVisitor,
     )(
       implicit fa: FieldAttributes
     ): (__Field, FunctorInterpreter[Op, F] => Step[Any]) = {
-      val hasArgs = e.input.shapeId != schema.Schema.unit.shapeId
+      val hasArgs = e.input.shapeId != smithy4s.schema.Schema.unit.shapeId
 
       if (hasArgs)
         // function type
@@ -86,11 +91,11 @@ object CalibanGraphQLInterpreter {
           interp(e.wrap(i))
         }(
           Schema.functionSchema[Any, Any, I, F[O]](
-            e.input.compile(ArgBuilderVisitor),
-            e.input.compile(CalibanSchemaVisitor),
+            e.input.compile(abv),
+            e.input.compile(csv),
             catsEffectSchema(
               FromEffect.forDispatcher,
-              e.output.compile(CalibanSchemaVisitor),
+              e.output.compile(csv),
             ),
           ),
           fa,
@@ -99,7 +104,7 @@ object CalibanGraphQLInterpreter {
         val inputDecodedFromEmptyObj: I =
           e
             .input
-            .compile(ArgBuilderVisitor)
+            .compile(abv)
             .build(InputValue.ObjectValue(Map.empty))
             .toTry
             .get
@@ -109,7 +114,7 @@ object CalibanGraphQLInterpreter {
         }(
           catsEffectSchema(
             FromEffect.forDispatcher,
-            e.output.compile(CalibanSchemaVisitor),
+            e.output.compile(csv),
           ),
           fa,
         )
