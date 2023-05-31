@@ -149,7 +149,7 @@ object CalibanSchemaTests extends SimpleIOSuite {
 
   test("enum schema") {
     testQueryResultWithSchema(
-      Ingredient.Tomato.widen,
+      Ingredient.TOMATO.widen,
       """query { item }""".stripMargin,
     )(Ingredient.schema.nested("item"))
       .map(assert.eql(_, Json.obj("item" := "Tomato")))

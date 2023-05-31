@@ -19,6 +19,25 @@ union Foo {
     bDec: BigDecimal
 }
 
+intEnum EnumResult {
+    FIRST = 1
+    SECOND = 2
+}
+
+enum Ingredient {
+    MUSHROOM
+    CHEESE
+    SALAD
+    TOMATO = "Tomato"
+}
+
+structure CityCoordinates {
+    @required
+    latitude: Float
+    @required
+    longitude: Float
+}
+
 service WeatherService {
     operations: [ListCities, RefreshCities]
 }

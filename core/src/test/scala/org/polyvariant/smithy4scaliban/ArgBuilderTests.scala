@@ -138,7 +138,7 @@ object ArgBuilderTests extends FunSuite {
   test("enum schema") {
     decodeArgSuccess(
       Value.StringValue("Tomato"),
-      Ingredient.Tomato.widen,
+      Ingredient.TOMATO.widen,
     )
   }
 
