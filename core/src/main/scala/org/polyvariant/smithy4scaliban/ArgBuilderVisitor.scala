@@ -87,11 +87,13 @@ private[smithy4scaliban] object ArgBuilderVisitor extends SchemaVisitor[ArgBuild
           )
     }
 
-    { case InputValue.ObjectValue(objectFields) =>
-      fieldsCompiled
-        .traverse { case (label, f) => f.build(objectFields.getOrElse(label, NullValue)) }
-        .map(make)
-    // todo other cases
+    {
+      case InputValue.ObjectValue(objectFields) =>
+        fieldsCompiled
+          .traverse { case (label, f) => f.build(objectFields.getOrElse(label, NullValue)) }
+          .map(make)
+
+      case iv => Left(CalibanError.ExecutionError(s"Expected object, got $iv"))
     }
   }
 
@@ -112,7 +114,7 @@ private[smithy4scaliban] object ArgBuilderVisitor extends SchemaVisitor[ArgBuild
             CalibanError.ExecutionError(msg = "Invalid union case: " + k)
           )
           .flatMap(_.build(v))
-      // todo other cases
+      case iv => Left(CalibanError.ExecutionError(s"Expected object with single key, got $iv"))
     }
   }
 
