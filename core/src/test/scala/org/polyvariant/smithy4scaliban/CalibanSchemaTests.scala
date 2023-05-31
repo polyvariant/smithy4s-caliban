@@ -30,8 +30,13 @@ import smithy4s.example.Ingredient
 import smithy4s.example.EnumResult
 import smithy4s.example.Rec
 import Smithy4sTestUtils._
+import smithy4s.Timestamp
+import smithy.api.TimestampFormat
 
 object CalibanSchemaTests extends SimpleIOSuite {
+  // Workaround for https://github.com/disneystreaming/smithy4s/issues/537
+  // works by eagerly instantiating the Timestamp type and everything in its schema
+  Schema.timestamp.shapeId.show: Unit
 
   test("structure schema - all fields required") {
     testQueryResultWithSchema(
@@ -156,6 +161,30 @@ object CalibanSchemaTests extends SimpleIOSuite {
       """query { item }""".stripMargin,
     )(EnumResult.schema.nested("item"))
       .map(assert.eql(_, Json.obj("item" := 2)))
+  }
+
+  test("timestamp schema (default: epoch second)") {
+    testQueryResultWithSchema(
+      Timestamp.epoch,
+      """query { item }""".stripMargin,
+    )(Schema.timestamp.nested("item"))
+      .map(assert.eql(_, Json.obj("item" := 0L)))
+  }
+
+  test("timestamp schema (DATE_TIME)") {
+    testQueryResultWithSchema(
+      Timestamp.epoch,
+      """query { item }""".stripMargin,
+    )(Schema.timestamp.addHints(TimestampFormat.DATE_TIME.widen).nested("item"))
+      .map(assert.eql(_, Json.obj("item" := "1970-01-01T00:00:00Z")))
+  }
+
+  test("timestamp schema (HTTP_DATE)") {
+    testQueryResultWithSchema(
+      Timestamp.epoch,
+      """query { item }""".stripMargin,
+    )(Schema.timestamp.addHints(TimestampFormat.HTTP_DATE.widen).nested("item"))
+      .map(assert.eql(_, Json.obj("item" := "Thu, 01 Jan 1970 00:00:00 GMT")))
   }
 
   test("map schema") {

@@ -35,6 +35,7 @@ import smithy4s.schema
 import smithy4s.schema.CollectionTag
 import smithy4s.Lazy
 import smithy4s.IntEnum
+import smithy.api.TimestampFormat
 
 // todo: caching
 private object CalibanSchemaVisitor extends SchemaVisitor[Schema[Any, *]] {
@@ -53,9 +54,13 @@ private object CalibanSchemaVisitor extends SchemaVisitor[Schema[Any, *]] {
     implicit val documentSchema: Schema[Any, Document] = Schema
       .unitSchema
       .asInstanceOf[Schema[Any, Document]] // TODO
-    implicit val timestampSchema: Schema[Any, Timestamp] = Schema
-      .instantSchema
-      .contramap(_.toInstant) // TODO UNTESTED
+    implicit val timestampSchema: Schema[Any, Timestamp] =
+      hints.get(TimestampFormat) match {
+        case Some(TimestampFormat.EPOCH_SECONDS) | None =>
+          Schema.longSchema.contramap(_.epochSecond)
+
+        case Some(format) => Schema.stringSchema.contramap(_.format(format))
+      }
 
     Primitive
       .deriving[Schema[Any, *]]
