@@ -29,7 +29,7 @@ lazy val core = projectMatrix
     name := "smithy4s-caliban",
     commonSettings,
     libraryDependencies ++= Seq(
-      "com.github.ghostdogpr" %%% "caliban-http4s" % "2.2.1",
+      "com.github.ghostdogpr" %%% "caliban-cats" % "2.2.1",
       "com.disneystreaming.smithy4s" %%% "smithy4s-core" % smithy4s.codegen.BuildInfo.version,
       // todo: get rid of this and only use our own types
       "com.disneystreaming.smithy4s" %%% "smithy4s-tests" % smithy4s
