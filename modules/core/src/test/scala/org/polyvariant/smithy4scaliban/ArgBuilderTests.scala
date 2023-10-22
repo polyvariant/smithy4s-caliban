@@ -16,25 +16,25 @@
 
 package org.polyvariant.smithy4scaliban
 
-import weaver._
-import smithy4s.Schema
-import caliban.Value
-import smithy4s.Bijection
-import smithy.api.Length
 import caliban.InputValue
+import caliban.Value
+import smithy.api.Length
+import smithy.api.TimestampFormat
+import smithy4s.Bijection
+import smithy4s.Blob
+import smithy4s.Document
+import smithy4s.Schema
+import smithy4s.Timestamp
 import smithy4s.example.CityCoordinates
-import smithy4s.example.MovieTheater
+import smithy4s.example.EnumResult
 import smithy4s.example.Foo
 import smithy4s.example.Ingredient
-import smithy4s.example.EnumResult
+import smithy4s.example.MovieTheater
 import smithy4s.example.Rec
-import smithy4s.Document
-import java.time.Instant
-import smithy4s.Timestamp
-import smithy.api.TimestampFormat
-import smithy4s.ByteArray
-import Smithy4sTestUtils._
 import smithy4s.schema.CompilationCache
+import weaver._
+
+import java.time.Instant
 
 object ArgBuilderTests extends FunSuite {
   private val abv = new ArgBuilderVisitor(CompilationCache.nop)
@@ -281,8 +281,8 @@ object ArgBuilderTests extends FunSuite {
 
   test("bytes") {
     decodeArgSuccess(
-      Value.StringValue(ByteArray(Array(1, 2, 3)).toString),
-      ByteArray(Array(1, 2, 3)),
+      Value.StringValue(Blob(Array[Byte](1, 2, 3)).toBase64String),
+      Blob(Array[Byte](1, 2, 3)),
     )(Schema.bytes)
   }
 

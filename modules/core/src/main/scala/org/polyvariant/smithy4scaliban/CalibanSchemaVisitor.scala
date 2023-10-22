@@ -23,22 +23,20 @@ import caliban.schema._
 import cats.implicits._
 import smithy.api.TimestampFormat
 import smithy4s.Bijection
-import smithy4s.ByteArray
 import smithy4s.Document
 import smithy4s.Hints
-import smithy4s.IntEnum
 import smithy4s.Lazy
 import smithy4s.Refinement
 import smithy4s.ShapeId
 import smithy4s.Timestamp
 import smithy4s.schema
-import smithy4s.schema.Alt
+import smithy4s.schema.EnumTag
 import smithy4s.schema.CollectionTag
 import smithy4s.schema.Field
-import smithy4s.schema.Field.Wrapped
 import smithy4s.schema.Primitive
-import smithy4s.schema.SchemaAlt
+import smithy4s.schema.Alt
 import smithy4s.schema.SchemaVisitor
+import smithy4s.Blob
 
 private class CalibanSchemaVisitor(val cache: schema.CompilationCache[Schema[Any, *]])
   extends SchemaVisitor.Cached[Schema[Any, *]] {
@@ -56,6 +54,10 @@ private class CalibanSchemaVisitor(val cache: schema.CompilationCache[Schema[Any
       makeResponse = f,
     )
 
+  override def option[A](
+    schema: smithy4s.Schema[A]
+  ): Schema[Any, Option[A]] = Schema.optionSchema(schema.compile(this))
+
   override def primitive[P](
     shapeId: ShapeId,
     hints: Hints,
@@ -64,8 +66,8 @@ private class CalibanSchemaVisitor(val cache: schema.CompilationCache[Schema[Any
     implicit val byteSchema: Schema[Any, Byte] = fromScalar(shapeId)(v => Value.IntValue(v.toInt))
 
     // base-64 encoded string
-    implicit val blobSchema: Schema[Any, ByteArray] =
-      fromScalar(shapeId)(v => Value.StringValue(v.toString()))
+    implicit val blobSchema: Schema[Any, Blob] =
+      fromScalar(shapeId)(v => Value.StringValue(v.toBase64String))
 
     // json "any" type
     implicit val documentSchema: Schema[Any, Document] = fromScalar(shapeId)(documentToValue)
@@ -94,18 +96,11 @@ private class CalibanSchemaVisitor(val cache: schema.CompilationCache[Schema[Any
   }
 
   private def field[S, A](
-    f: Field[Schema[Any, *], S, A]
+    f: Field[S, A]
   )(
     implicit fa: FieldAttributes
   ) = {
-    val schema = f
-      .instanceA(new Field.ToOptional[Schema[Any, *]] {
-
-        override def apply[A0](
-          fa: Schema[Any, A0]
-        ): Wrapped[Schema[Any, *], Option, A0] = Schema.optionSchema(fa)
-
-      })
+    val schema = f.schema.compile(this)
 
     Schema.field(f.label)(f.get)(
       schema,
@@ -126,12 +121,11 @@ private class CalibanSchemaVisitor(val cache: schema.CompilationCache[Schema[Any
   override def struct[S](
     shapeId: ShapeId,
     hints: Hints,
-    fields: Vector[Field[smithy4s.Schema, S, ?]],
+    fields: Vector[Field[S, ?]],
     make: IndexedSeq[Any] => S,
   ): Schema[Any, S] = Schema
     .obj(shapeId.name, None) { implicit fa =>
       fields
-        .map(_.mapK(this))
         .map(field(_))
         .toList
     }
@@ -169,14 +163,14 @@ private class CalibanSchemaVisitor(val cache: schema.CompilationCache[Schema[Any
   override def union[U](
     shapeId: ShapeId,
     hints: Hints,
-    alternatives: Vector[SchemaAlt[U, _]],
-    dispatch: Alt.Dispatcher[smithy4s.Schema, U],
+    alternatives: Vector[Alt[U, _]],
+    dispatch: Alt.Dispatcher[U],
   ): Schema[Any, U] = {
     val self = this
 
     type Resolve[A] = A => Step[Any]
 
-    val resolve0 = dispatch.compile(new Alt.Precompiler[smithy4s.Schema, Resolve] {
+    val resolve0 = dispatch.compile(new Alt.Precompiler[Resolve] {
       override def apply[A](
         label: String,
         instance: smithy4s.Schema[A],
@@ -205,25 +199,26 @@ private class CalibanSchemaVisitor(val cache: schema.CompilationCache[Schema[Any
     }
   }.withName(shapeId)
 
-  private def handleAlt[U, A](parent: ShapeId, alt: SchemaAlt[U, A]) =
+  private def handleAlt[U, A](parent: ShapeId, alt: Alt[U, A]) =
     Schema.obj(
       parent.name + alt.label + "Case"
     )(fa =>
       List(
         Schema
-          .field[A](alt.label)(a => a)(alt.instance.compile(this), fa)
+          .field[A](alt.label)(a => a)(alt.schema.compile(this), fa)
       )
     )
 
   override def enumeration[E](
     shapeId: ShapeId,
     hints: Hints,
+    tag: EnumTag[E],
     values: List[schema.EnumValue[E]],
     total: E => schema.EnumValue[E],
   ): Schema[Any, E] = {
-    hints.has(IntEnum) match {
-      case false => Schema.stringSchema.contramap(total(_: E).stringValue)
-      case true  => Schema.intSchema.contramap(total(_: E).intValue)
+    tag match {
+      case EnumTag.IntEnum() => Schema.intSchema.contramap(total(_: E).intValue)
+      case _                 => Schema.stringSchema.contramap(total(_: E).stringValue)
     }
   }.withName(shapeId)
 
