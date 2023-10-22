@@ -19,7 +19,6 @@ package org.polyvariant.smithy4scaliban
 import caliban.Value.NullValue
 import cats.implicits._
 import smithy4s.Bijection
-import smithy4s.ByteArray
 import smithy4s.Document
 import smithy4s.Hints
 import smithy4s.Refinement
@@ -27,11 +26,9 @@ import smithy4s.ShapeId
 import smithy4s.Timestamp
 import smithy4s.Schema
 import smithy4s.schema.Field
-import smithy4s.schema.Field.Wrapped
 import smithy4s.schema.Primitive
 import smithy4s.schema.SchemaVisitor
 import smithy4s.schema.Alt
-import smithy4s.schema.SchemaAlt
 import caliban.schema.ArgBuilder
 import caliban.InputValue
 import caliban.CalibanError
@@ -51,8 +48,9 @@ import caliban.Value.IntValue.LongNumber
 import caliban.InputValue.ObjectValue
 import caliban.InputValue.ListValue
 import smithy.api.TimestampFormat
-import smithy4s.IntEnum
 import smithy4s.schema.CompilationCache
+import smithy4s.schema.EnumTag
+import smithy4s.Blob
 
 private[smithy4scaliban] class ArgBuilderVisitor(val cache: CompilationCache[ArgBuilder])
   extends SchemaVisitor.Cached[ArgBuilder] {
@@ -72,20 +70,11 @@ private[smithy4scaliban] class ArgBuilderVisitor(val cache: CompilationCache[Arg
   override def struct[S](
     shapeId: ShapeId,
     hints: Hints,
-    fields: Vector[Field[smithy4s.Schema, S, ?]],
+    fields: Vector[Field[S, ?]],
     make: IndexedSeq[Any] => S,
   ): ArgBuilder[S] = {
     val fieldsCompiled = fields.map { f =>
-      f.label ->
-        f.mapK(this)
-          .instanceA(
-            new Field.ToOptional[ArgBuilder] {
-              override def apply[A0](
-                fa: ArgBuilder[A0]
-              ): Wrapped[ArgBuilder, Option, A0] = ArgBuilder.option(fa)
-
-            }
-          )
+      f.label -> f.schema.compile(this)
     }
 
     {
@@ -98,11 +87,15 @@ private[smithy4scaliban] class ArgBuilderVisitor(val cache: CompilationCache[Arg
     }
   }
 
+  override def option[A](
+    schema: Schema[A]
+  ): ArgBuilder[Option[A]] = ArgBuilder.option(schema.compile(this))
+
   override def union[U](
     shapeId: ShapeId,
     hints: Hints,
-    alternatives: Vector[SchemaAlt[U, _]],
-    dispatch: Alt.Dispatcher[smithy4s.schema.Schema, U],
+    alternatives: Vector[Alt[U, _]],
+    dispatch: Alt.Dispatcher[U],
   ): ArgBuilder[U] = {
     val instancesByKey = alternatives.map(alt => alt.label -> handleAlt(alt)).toMap
 
@@ -120,17 +113,18 @@ private[smithy4scaliban] class ArgBuilderVisitor(val cache: CompilationCache[Arg
   }
 
   private def handleAlt[U, A](
-    alt: Alt[Schema, U, A]
-  ): ArgBuilder[U] = alt.instance.compile(this).map(alt.inject)
+    alt: Alt[U, A]
+  ): ArgBuilder[U] = alt.schema.compile(this).map(alt.inject)
 
   override def enumeration[E](
     shapeId: ShapeId,
     hints: Hints,
+    tag: EnumTag[E],
     values: List[EnumValue[E]],
     total: E => EnumValue[E],
   ): ArgBuilder[E] =
-    hints.has(IntEnum) match {
-      case false =>
+    tag match {
+      case EnumTag.StringEnum() =>
         val valuesByString = values.map(v => v.stringValue -> v.value).toMap
 
         ArgBuilder
@@ -141,7 +135,7 @@ private[smithy4scaliban] class ArgBuilderVisitor(val cache: CompilationCache[Arg
               .toRight(CalibanError.ExecutionError("Unknown enum case: " + v))
           }
 
-      case true =>
+      case _ =>
         val valuesByInt = values.map(v => v.intValue -> v.value).toMap
 
         ArgBuilder
@@ -183,8 +177,8 @@ private[smithy4scaliban] class ArgBuilderVisitor(val cache: CompilationCache[Arg
       case i => Left(CalibanError.ExecutionError("Integer too large for byte: " + i))
     }
 
-    implicit val byteArrayArgBuilder: ArgBuilder[ByteArray] = ArgBuilder.string.map { str =>
-      ByteArray(Base64.getDecoder().decode(str))
+    implicit val byteArrayArgBuilder: ArgBuilder[Blob] = ArgBuilder.string.map { str =>
+      Blob(Base64.getDecoder().decode(str))
     }
 
     implicit val documentArgBuilder: ArgBuilder[Document] =

@@ -50,12 +50,12 @@ object CalibanGraphQLInterpreter {
 
     val querySchema: Schema[Any, service.FunctorInterpreter[F]] =
       Schema.obj(name = "Queries", description = None)(implicit fa =>
-        queries.map(endpointToSchema[F].apply(_, abv, csv))
+        queries.map(endpointToSchema[F].apply(_, abv, csv)).toList
       )
 
     val mutationSchema: Schema[Any, service.FunctorInterpreter[F]] =
       Schema.obj(name = "Mutations", description = None)(implicit fa =>
-        mutations.map(endpointToSchema[F].apply(_, abv, csv))
+        mutations.map(endpointToSchema[F].apply(_, abv, csv)).toList
       )
 
     caliban.graphQL(

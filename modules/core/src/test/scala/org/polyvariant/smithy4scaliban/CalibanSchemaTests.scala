@@ -32,8 +32,8 @@ import smithy4s.example.Rec
 import Smithy4sTestUtils._
 import smithy4s.Timestamp
 import smithy.api.TimestampFormat
-import smithy4s.ByteArray
 import smithy4s.Document
+import smithy4s.Blob
 
 object CalibanSchemaTests extends SimpleIOSuite {
   // Workaround for https://github.com/disneystreaming/smithy4s/issues/537
@@ -175,7 +175,7 @@ object CalibanSchemaTests extends SimpleIOSuite {
 
   test("blob schema") {
     testQueryResultWithSchema(
-      ByteArray("foo".getBytes()),
+      Blob("foo"),
       """query { item }""".stripMargin,
     )(Schema.bytes.nested("item"))
       .map(assert.eql(_, Json.obj("item" := "Zm9v")))
